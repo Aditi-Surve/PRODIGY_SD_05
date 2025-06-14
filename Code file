@@ -1,0 +1,54 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+# Target URL (scrapable practice site)
+BASE_URL = "http://books.toscrape.com/"
+
+def get_page(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return BeautifulSoup(response.text, 'html.parser')
+
+def extract_product_info(soup):
+    product_list = []
+    articles = soup.find_all('article', class_='product_pod')
+    
+    for article in articles:
+        name = article.h3.a['title']
+        price = article.find('p', class_='price_color').text.strip().lstrip('£')
+        rating_class = article.p['class'][1]  # e.g., "Three", "Four"
+        rating = convert_rating(rating_class)
+        
+        product_list.append({
+            'Name': name,
+            'Price (GBP)': float(price),
+            'Rating': rating
+        })
+    return product_list
+
+def convert_rating(rating_str):
+    ratings = {'One': 1, 'Two': 2, 'Three': 3, 'Four': 4, 'Five': 5}
+    return ratings.get(rating_str, 0)
+
+def scrape_books(num_pages=1):
+    all_products = []
+    
+    for page in range(1, num_pages + 1):
+        url = BASE_URL + f"catalogue/page-{page}.html" if page > 1 else BASE_URL
+        print(f"Scraping: {url}")
+        soup = get_page(url)
+        products = extract_product_info(soup)
+        all_products.extend(products)
+    
+    return all_products
+
+def save_to_csv(data, filename='products.csv'):
+    df = pd.DataFrame(data)
+    df.to_csv(filename, index=False)
+    print(f"Data saved to {filename}")
+
+# --- Run Script ---
+if __name__ == "__main__":
+    products = scrape_books(num_pages=3)  # Scrape first 3 pages
+    save_to_csv(products)
